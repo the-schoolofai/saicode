@@ -1,0 +1,115 @@
+name: Release
+
+# Publishing uses PyPI Trusted Publishing (OIDC): no API tokens are stored anywhere.
+#
+#   Run workflow (manual)      -> CI -> TestPyPI          rehearsal
+#   GitHub Release published   -> CI -> check tag -> PyPI -> attach files to the release
+#
+# The files published are exactly the ones CI built and checked; nothing is rebuilt.
+# One-time setup and the release checklist are in RELEASING.md.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# Every job gets only the permissions it needs.
+permissions: {}
+
+# Never run two releases for the same ref at once, and never cancel a release midway.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    # A reusable workflow is loaded from this commit when the run starts, so the
+    # long-supported "./" form is safe here.
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
+  check-version:
+    name: Check tag matches package version
+    if: github.event_name == 'release'
+    needs: [ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Compare the release tag with the built files
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG#v}"
+          echo "Release tag: ${TAG}"
+          ls -l dist/
+          if [ ! -f "dist/saicode-${version}-py3-none-any.whl" ] \
+             || [ ! -f "dist/saicode-${version}.tar.gz" ]; then
+            echo "::error::Tag ${TAG} does not match the package version. Set __version__ in src/saicode/__init__.py to ${version}, or fix the tag."
+            exit 1
+          fi
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    if: github.event_name == 'workflow_dispatch'
+    needs: [ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/saicode
+    permissions:
+      id-token: write # Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    if: github.event_name == 'release'
+    needs: [ci, check-version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/saicode
+    permissions:
+      id-token: write # Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+
+  release-assets:
+    name: Attach files to the GitHub Release
+    needs: [publish-pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # upload release assets
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Upload the sdist and wheel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "${TAG}" dist/* --repo "${GITHUB_REPOSITORY}" --clobber

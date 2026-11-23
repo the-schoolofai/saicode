@@ -150,6 +150,8 @@ uv run mypy                  # type check
 CI runs all of these on every push and pull request, testing Python 3.11 to 3.14 on
 Linux, macOS and Windows. A pull request should keep every check green.
 
+Maintainers: the release process is described in [RELEASING.md](https://github.com/the-schoolofai/saicode/blob/main/RELEASING.md).
+
 ## Known limits in 0.3.0
 
 - Commands run without an OS sandbox (phase A2). Set `sandbox.required = true` to refuse commands until then.

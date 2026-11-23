@@ -5,14 +5,17 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # The release workflow runs CI first and publishes the "dist" artifact built here.
+  workflow_call:
 
 # Least privilege: CI only needs to read the repository.
 permissions:
   contents: read
 
-# Cancel superseded runs on the same branch or pull request.
+# Cancel superseded runs on the same branch or pull request. The "ci-" prefix keeps
+# this group separate from the caller's group when the release workflow calls CI.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
