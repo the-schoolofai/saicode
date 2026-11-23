@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 from conftest import FakeProvider, reply
-
 from saicode.ai.base import ProviderError
 from saicode.core.agent import Agent
 from saicode.core.config import load_config
@@ -48,8 +47,10 @@ def test_plain_answer(project):
 
 
 def test_edit_is_approved_and_applied(project):
-    replies = [reply(calls=[("edit_file", {"path": "app.py", "old_text": "hi", "new_text": "hello"})]),
-               reply("Done")]
+    replies = [
+        reply(calls=[("edit_file", {"path": "app.py", "old_text": "hi", "new_text": "hello"})]),
+        reply("Done"),
+    ]
     agent, events, asked, _, _ = make_agent(project, replies, answers=["yes"])
     agent.run_turn("change greeting")
     assert (project / "app.py").read_text() == "print('hello')\n"
@@ -60,9 +61,11 @@ def test_edit_is_approved_and_applied(project):
 
 
 def test_denied_edit_leaves_file(project):
-    replies = [reply(calls=[("edit_file", {"path": "app.py", "old_text": "hi", "new_text": "bye"})]),
-               reply("ok")]
-    agent, events, _, provider, _ = make_agent(project, replies, answers=["no"])
+    replies = [
+        reply(calls=[("edit_file", {"path": "app.py", "old_text": "hi", "new_text": "bye"})]),
+        reply("ok"),
+    ]
+    agent, _events, _, provider, _ = make_agent(project, replies, answers=["no"])
     agent.run_turn("change")
     assert (project / "app.py").read_text() == "print('hi')\n"
     sent_results = provider.chat.sent[1]
@@ -71,7 +74,7 @@ def test_denied_edit_leaves_file(project):
 
 def test_protected_file_never_reaches_model(project):
     replies = [reply(calls=[("read_file", {"path": ".env"})]), reply("ok")]
-    agent, events, asked, provider, _ = make_agent(project, replies)
+    agent, _events, asked, provider, _ = make_agent(project, replies)
     agent.run_turn("read env")
     output = provider.chat.sent[1][0].output
     assert "SECRET" not in output and output.startswith("Not allowed")
@@ -79,9 +82,11 @@ def test_protected_file_never_reaches_model(project):
 
 
 def test_always_skips_later_prompts(project):
-    replies = [reply(calls=[("run_command", {"command": "echo one"})]),
-               reply(calls=[("run_command", {"command": "echo two"})]),
-               reply("done")]
+    replies = [
+        reply(calls=[("run_command", {"command": "echo one"})]),
+        reply(calls=[("run_command", {"command": "echo two"})]),
+        reply("done"),
+    ]
     agent, events, asked, _, _ = make_agent(project, replies, answers=["always"])
     agent.run_turn("run")
     assert len(asked) == 1
@@ -118,10 +123,10 @@ def test_unrecoverable_error_stops_turn(project):
 
 def test_session_log_omits_content_by_default(project, tmp_path):
     replies = [reply(calls=[("read_file", {"path": "app.py"})]), reply("ok")]
-    agent, events, _, _, log = make_agent(project, replies, log_dir=tmp_path / "logs")
+    agent, _events, _, _, log = make_agent(project, replies, log_dir=tmp_path / "logs")
     agent.run_turn("read app")
     log.close()
-    records = [json.loads(l) for l in log.path.read_text().splitlines()]
+    records = [json.loads(line) for line in log.path.read_text().splitlines()]
     assert all(r["session_id"] == agent.bus.session_id and r["user"] == "tester" for r in records)
     assert [r["seq"] for r in records] == sorted(r["seq"] for r in records)
     result = next(r for r in records if r["type"] == "tool_result")
@@ -131,7 +136,9 @@ def test_session_log_omits_content_by_default(project, tmp_path):
 
 def test_session_log_can_include_content(project, tmp_path):
     replies = [reply(calls=[("read_file", {"path": "app.py"})]), reply("ok")]
-    agent, _, _, _, log = make_agent(project, replies, log_dir=tmp_path / "logs", include_content=True)
+    agent, _, _, _, log = make_agent(
+        project, replies, log_dir=tmp_path / "logs", include_content=True
+    )
     agent.run_turn("read app")
     log.close()
     assert "print('hi')" in log.path.read_text()
@@ -147,6 +154,7 @@ def test_step_limit(project):
 
 def test_core_does_not_import_tui():
     import pathlib
+
     core = pathlib.Path(__file__).parents[1] / "src" / "saicode"
     for pkg in ("core", "ai", "tools", "sandbox"):
         for f in (core / pkg).rglob("*.py"):
@@ -154,3 +162,34 @@ def test_core_does_not_import_tui():
                 stripped = line.strip()
                 if stripped.startswith(("import ", "from ")):
                     assert "saicode.tui" not in stripped, f"{f} imports the UI"
+
+
+def test_tool_results_retry_on_the_switched_model(project):
+    """After a quota error while sending tool results, the retry must use the new model's chat."""
+    from conftest import FakeChat
+
+    err = ProviderError("quota", "limit: 0", free_tier=True, no_quota=True, daily=True)
+    chats = {
+        "m1": FakeChat([reply(calls=[("list_files", {"path": "."})]), err]),
+        "m2": FakeChat([reply("done")]),
+    }
+
+    class PerModelProvider:
+        name = "fake"
+
+        def start_chat(self, model, system, tools, history=None):
+            return chats[model]
+
+    agent, events, _, _, _ = make_agent(project, [])
+    agent.provider = PerModelProvider()
+    agent.chat = agent._new_chat()
+
+    def on_error(e):
+        agent.switch_model("m2")
+        return "retry"
+
+    agent.on_error = on_error
+    agent.run_turn("list")
+    assert len(chats["m2"].sent) == 1  # the tool results went to the new chat
+    assert chats["m2"].sent[0][0].call.name == "list_files"
+    assert types(events)[-1] == "turn_end"

@@ -11,6 +11,7 @@ from rich.markdown import Markdown
 from rich.markup import escape
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.status import Status
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
@@ -44,12 +45,19 @@ console = Console(highlight=False)
 
 def short_home(path: Path | str) -> str:
     home, s = str(Path.home()), str(path)
-    return "~" + s[len(home):] if s.startswith(home) else s
+    return "~" + s[len(home) :] if s.startswith(home) else s
 
 
 def notice(title: str, body: str, style: str = WARN) -> None:
-    console.print(Panel(body, title=f"[bold {style}]{title}[/]", title_align="left",
-                        border_style=style, padding=(1, 2)))
+    console.print(
+        Panel(
+            body,
+            title=f"[bold {style}]{title}[/]",
+            title_align="left",
+            border_style=style,
+            padding=(1, 2),
+        )
+    )
 
 
 # ---- event renderer ------------------------------------------------------------
@@ -59,7 +67,7 @@ class Renderer:
     """Turns core events into screen output."""
 
     def __init__(self) -> None:
-        self.status = None
+        self.status: Status | None = None
 
     def _stop(self) -> None:
         if self.status is not None:
@@ -89,7 +97,9 @@ class Renderer:
             console.print(Markdown(d["text"]))
             console.print()
         elif t == "tool_call":
-            console.print(Text.assemble(("● ", ACCENT), (d["action"], "bold"), ("  " + str(d["target"]), "")))
+            console.print(
+                Text.assemble(("● ", ACCENT), (d["action"], "bold"), ("  " + str(d["target"]), ""))
+            )
         elif t == "tool_result":
             style = {"ok": MUTED, "denied": ERR, "error": ERR}.get(d["status"], MUTED)
             if d["tool"] in ("write_file", "edit_file") and d["status"] == "ok":
@@ -101,13 +111,17 @@ class Renderer:
                 for line in str(d["content"]).splitlines()[-8:]:
                     console.print(Text("    " + line, style=MUTED))
         elif t == "turn_end":
-            console.print(Text(f"  {d['tokens_in']:,} in · {d['tokens_out']:,} out (session)", style=MUTED))
+            console.print(
+                Text(f"  {d['tokens_in']:,} in · {d['tokens_out']:,} out (session)", style=MUTED)
+            )
         elif t == "cancelled":
             console.print(Text("  cancelled", style=WARN))
         elif t == "step_limit":
             notice("Stopped", f"Reached the limit of {d['limit']} tool steps for one request.")
         elif t == "model_switched":
-            console.print(Text.assemble(("  model switched to ", MUTED), (d["new"], f"bold {ACCENT}")))
+            console.print(
+                Text.assemble(("  model switched to ", MUTED), (d["new"], f"bold {ACCENT}"))
+            )
         elif t == "conversation_reset":
             console.print(Text("  new conversation started", style=MUTED))
 
@@ -122,13 +136,14 @@ def approver(req: ApprovalRequest) -> str:
         path = req.detail_format[5:]
         lines = req.detail.splitlines()
         shown = "\n".join(lines[:60]) + ("\n..." if len(lines) > 60 else "")
-        body = Syntax(shown, Syntax.guess_lexer(path, code=req.detail), theme="ansi_dark",
-                      line_numbers=True)
+        body = Syntax(
+            shown, Syntax.guess_lexer(path, code=req.detail), theme="ansi_dark", line_numbers=True
+        )
     else:
         body = Syntax(req.detail, "bash", theme="ansi_dark")
     console.print(Panel(body, border_style=MUTED, padding=(0, 1)))
     kind_name = "file changes" if req.kind == "write" else "commands"
-    options = f"(y) yes  (n) no" + (f"  (a) always for {kind_name}" if req.can_always else "")
+    options = "(y) yes  (n) no" + (f"  (a) always for {kind_name}" if req.can_always else "")
     while True:
         answer = console.input(f"  [bold]Allow?[/] [{MUTED}]{options}[/] ").strip().lower()
         if answer in ("y", "yes"):
@@ -144,9 +159,19 @@ def approver(req: ApprovalRequest) -> str:
 
 
 class App:
-    def __init__(self, *, config: Config, provider: Provider, agent: Agent, bus: EventBus,
-                 policy: Policy, log: SessionLog | None, key_source: str, workdir: Path,
-                 runner_name: str):
+    def __init__(
+        self,
+        *,
+        config: Config,
+        provider: Provider,
+        agent: Agent,
+        bus: EventBus,
+        policy: Policy,
+        log: SessionLog | None,
+        key_source: str,
+        workdir: Path,
+        runner_name: str,
+    ):
         self.config = config
         self.provider = provider
         self.agent = agent
@@ -165,7 +190,9 @@ class App:
         for i, name in enumerate(candidates, 1):
             table.add_row(f"[{ACCENT}]{i}[/]", name)
         console.print(table)
-        choice = console.input(f"  [bold]{prompt}[/] [{MUTED}](number, Enter to cancel)[/] ").strip()
+        choice = console.input(
+            f"  [bold]{prompt}[/] [{MUTED}](number, Enter to cancel)[/] "
+        ).strip()
         if choice.isdigit() and 1 <= int(choice) <= len(candidates):
             return candidates[int(choice) - 1]
         return None
@@ -176,8 +203,10 @@ class App:
         detail = escape(e.message or "")
         if e.kind == "quota":
             if e.no_quota and e.free_tier:
-                reason = (f"[bold]{model}[/] is not available on the Gemini API free tier.\n"
-                          "Your API key's project has no billing attached, so this model has zero quota.")
+                reason = (
+                    f"[bold]{model}[/] is not available on the Gemini API free tier.\n"
+                    "Your API key's project has no billing attached, so this model has zero quota."
+                )
             elif e.daily:
                 reason = f"The daily quota for [bold]{model}[/] has been used up."
                 if e.retry_after:
@@ -185,9 +214,12 @@ class App:
                     reason += f" It resets in about {h}h {rem // 60}m."
             else:
                 reason = f"The quota for [bold]{model}[/] has been reached."
-            notice("Quota exceeded", reason + "\n\n"
-                   f"[{MUTED}]To use paid models: aistudio.google.com → API keys → Set up billing "
-                   "for this key's project.[/]")
+            notice(
+                "Quota exceeded",
+                reason + "\n\n"
+                f"[{MUTED}]To use paid models: aistudio.google.com → API keys → Set up billing "
+                "for this key's project.[/]",
+            )
             options = [m for m in self.config.get("model.fallbacks", []) if m != model]
             chosen = self.pick(options, "Switch to another model and retry?") if options else None
             if chosen:
@@ -195,15 +227,29 @@ class App:
                 return "retry"
             return None
         messages = {
-            "auth": ("Invalid API key", "The provider rejected the API key.\n"
-                     f"[{MUTED}]Run [bold]saicode login[/bold] to store a new key.[/]"),
-            "permission": ("Permission denied", f"This key cannot use this model.\n[{MUTED}]{detail[:300]}[/]"),
-            "not_found": ("Model not found", f"[bold]{model}[/] is not available for this key.\n"
-                          f"[{MUTED}]Type /model to choose one from the list.[/]"),
-            "network": ("Connection problem", "Could not reach the model service. Check your connection.\n"
-                        f"[{MUTED}]{detail[:300]}[/]"),
+            "auth": (
+                "Invalid API key",
+                "The provider rejected the API key.\n"
+                f"[{MUTED}]Run [bold]saicode login[/bold] to store a new key.[/]",
+            ),
+            "permission": (
+                "Permission denied",
+                f"This key cannot use this model.\n[{MUTED}]{detail[:300]}[/]",
+            ),
+            "not_found": (
+                "Model not found",
+                f"[bold]{model}[/] is not available for this key.\n"
+                f"[{MUTED}]Type /model to choose one from the list.[/]",
+            ),
+            "network": (
+                "Connection problem",
+                "Could not reach the model service. Check your connection.\n"
+                f"[{MUTED}]{detail[:300]}[/]",
+            ),
         }
-        title, body = messages.get(e.kind, (f"API error {e.code or ''}".strip(), f"[{MUTED}]{detail[:500]}[/]"))
+        title, body = messages.get(
+            e.kind, (f"API error {e.code or ''}".strip(), f"[{MUTED}]{detail[:500]}[/]")
+        )
         notice(title, body, ERR)
         return None
 
@@ -215,9 +261,12 @@ class App:
                 self.provider.check_model(self.agent.model)
             return "connected", OK
         except ProviderError as e:
-            return {"not_found": "model not found - type /model", "auth": "invalid API key",
-                    "permission": "permission denied for this key", "network": "offline"
-                    }.get(e.kind, f"error {e.code or ''}".strip()), ERR
+            return {
+                "not_found": "model not found - type /model",
+                "auth": "invalid API key",
+                "permission": "permission denied for this key",
+                "network": "offline",
+            }.get(e.kind, f"error {e.code or ''}".strip()), ERR
 
     def welcome(self) -> None:
         console.clear()
@@ -231,32 +280,64 @@ class App:
         info.add_row("version", __version__)
         info.add_row("model", Text(self.agent.model, style=f"bold {ACCENT}"))
         info.add_row("workspace", short_home(self.workdir))
-        info.add_row("permissions", self.policy.mode + (" (set by your organization)"
-                                                        if self.config.is_locked("permissions.mode") else ""))
+        info.add_row(
+            "permissions",
+            self.policy.mode
+            + (" (set by your organization)" if self.config.is_locked("permissions.mode") else ""),
+        )
         info.add_row("status", Text(status, style=style))
-        tips = Text.assemble(("/help", ACCENT), (" commands   ", MUTED), ("/model", ACCENT),
-                             (" switch model   ", MUTED), ("/status", ACCENT), (" session info   ", MUTED),
-                             ("/exit", ACCENT), (" quit", MUTED))
+        tips = Text.assemble(
+            ("/help", ACCENT),
+            (" commands   ", MUTED),
+            ("/model", ACCENT),
+            (" switch model   ", MUTED),
+            ("/status", ACCENT),
+            (" session info   ", MUTED),
+            ("/exit", ACCENT),
+            (" quit", MUTED),
+        )
         console.print(logo)
-        console.print(Panel(Group(info, Text(""), tips), title="[bold]saicode[/]", title_align="left",
-                            subtitle=f"[{MUTED}]terminal coding agent[/]", subtitle_align="right",
-                            border_style=ACCENT, padding=(1, 2)))
+        console.print(
+            Panel(
+                Group(info, Text(""), tips),
+                title="[bold]saicode[/]",
+                title_align="left",
+                subtitle=f"[{MUTED}]terminal coding agent[/]",
+                subtitle_align="right",
+                border_style=ACCENT,
+                padding=(1, 2),
+            )
+        )
         if any(layer.name == "system" for layer in self.config.layers):
-            console.print(Text("  Your organization's policy is active. Type /config to see it.", style=MUTED))
+            console.print(
+                Text("  Your organization's policy is active. Type /config to see it.", style=MUTED)
+            )
         console.print()
 
     def show_help(self) -> None:
         table = Table(show_header=False, box=None, padding=(0, 2))
         table.add_column(style=ACCENT)
         table.add_column()
-        for cmd, desc in [("/help", "show this help"), ("/model", "choose a model from the list"),
-                          ("/model <name>", "switch to a model by name"), ("/models", "list available models"),
-                          ("/status", "session, log file, key and policy"),
-                          ("/config", "effective settings and where each comes from"),
-                          ("/clear", "start a new conversation"), ("/exit", "quit saicode")]:
+        for cmd, desc in [
+            ("/help", "show this help"),
+            ("/model", "choose a model from the list"),
+            ("/model <name>", "switch to a model by name"),
+            ("/models", "list available models"),
+            ("/status", "session, log file, key and policy"),
+            ("/config", "effective settings and where each comes from"),
+            ("/clear", "start a new conversation"),
+            ("/exit", "quit saicode"),
+        ]:
             table.add_row(cmd, desc)
-        console.print(Panel(table, title="[bold]commands[/]", title_align="left",
-                            border_style=MUTED, padding=(1, 2)))
+        console.print(
+            Panel(
+                table,
+                title="[bold]commands[/]",
+                title_align="left",
+                border_style=MUTED,
+                padding=(1, 2),
+            )
+        )
 
     def show_status(self) -> None:
         table = Table.grid(padding=(0, 2))
@@ -270,10 +351,22 @@ class App:
         table.add_row("permissions", self.policy.mode)
         table.add_row("commands run", f"{self.runner_name} (sandbox arrives in phase A2)")
         table.add_row("session log", short_home(self.log.path) if self.log else "off")
-        table.add_row("config layers", ", ".join(f"{l.name}" + (f" ({short_home(l.path)})" if l.path else "")
-                                                 for l in self.config.layers))
-        console.print(Panel(table, title="[bold]status[/]", title_align="left", border_style=MUTED,
-                            padding=(1, 2)))
+        table.add_row(
+            "config layers",
+            ", ".join(
+                layer.name + (f" ({short_home(layer.path)})" if layer.path else "")
+                for layer in self.config.layers
+            ),
+        )
+        console.print(
+            Panel(
+                table,
+                title="[bold]status[/]",
+                title_align="left",
+                border_style=MUTED,
+                padding=(1, 2),
+            )
+        )
 
     def show_config(self) -> None:
         table = Table(box=None, padding=(0, 2), header_style=MUTED)
@@ -284,8 +377,15 @@ class App:
             shown = ", ".join(map(str, value)) if isinstance(value, list) else str(value)
             lock = " (locked)" if self.config.is_locked(key) else ""
             table.add_row(key, shown or "-", source + lock)
-        console.print(Panel(table, title="[bold]config[/]", title_align="left", border_style=MUTED,
-                            padding=(1, 1)))
+        console.print(
+            Panel(
+                table,
+                title="[bold]config[/]",
+                title_align="left",
+                border_style=MUTED,
+                padding=(1, 1),
+            )
+        )
 
     # ---- commands ------------------------------------------------------------------
 
@@ -325,11 +425,16 @@ class App:
         self.welcome()
         history = Path.home() / ".saicode" / "history"
         history.parent.mkdir(parents=True, exist_ok=True)
-        session = PromptSession(history=FileHistory(str(history)))
+        session: PromptSession[str] = PromptSession(history=FileHistory(str(history)))
 
         def toolbar():
-            return [("class:bottom-toolbar",
-                     f" {self.agent.model}  ·  {short_home(self.workdir)}  ·  {self.policy.mode}  ·  /help ")]
+            return [
+                (
+                    "class:bottom-toolbar",
+                    f" {self.agent.model}  ·  {short_home(self.workdir)}"
+                    f"  ·  {self.policy.mode}  ·  /help ",
+                )
+            ]
 
         while True:
             try:

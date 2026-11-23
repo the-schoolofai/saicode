@@ -8,10 +8,12 @@ Event types emitted:
 
 from __future__ import annotations
 
+import functools
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from saicode import tools
 from saicode.ai.base import Provider, ProviderError, Reply, ToolResult
@@ -20,7 +22,7 @@ from saicode.core.events import EventBus, new_id
 MAX_AUTO_WAIT = 90
 SERVER_RETRIES = 3
 
-ErrorHandler = Callable[[ProviderError], str | None]   # return "retry" to try again
+ErrorHandler = Callable[[ProviderError], str | None]  # return "retry" to try again
 
 
 def system_prompt(workdir: Path) -> str:
@@ -48,12 +50,21 @@ class Agent:
     chat: Any = field(default=None, init=False)
 
     def __post_init__(self) -> None:
-        self.ctx.on_running = lambda command: self.bus.emit("running", command=command)
+        self.ctx.on_running = self._on_running
         self.chat = self._new_chat()
 
+    def _on_running(self, command: str) -> None:
+        self.bus.emit("running", command=command)
+
+    def _send_tool_results(self, results: list[ToolResult]) -> Reply:
+        # self.chat is looked up on every call: after a quota error the retry
+        # may run on a switched (fallback) model with a new chat.
+        return self.chat.send_tool_results(results)
+
     def _new_chat(self, history: Any = None):
-        return self.provider.start_chat(self.model, system_prompt(self.ctx.workdir),
-                                        tools.specs(), history)
+        return self.provider.start_chat(
+            self.model, system_prompt(self.ctx.workdir), tools.specs(), history
+        )
 
     # ---- session control ----------------------------------------------------
 
@@ -81,19 +92,25 @@ class Agent:
                 self.bus.emit("cancelled")
                 return None
             except ProviderError as e:
-                if (e.kind == "quota" and not e.no_quota and not e.daily
-                        and e.retry_after is not None and e.retry_after <= MAX_AUTO_WAIT):
+                if (
+                    e.kind == "quota"
+                    and not e.no_quota
+                    and not e.daily
+                    and e.retry_after is not None
+                    and e.retry_after <= MAX_AUTO_WAIT
+                ):
                     self.bus.emit("waiting", seconds=e.retry_after, reason="rate limit")
                     self.sleep(e.retry_after + 1)
                     continue
                 if e.kind == "server" and server_tries < SERVER_RETRIES:
                     server_tries += 1
-                    wait = 2 ** server_tries
+                    wait = 2**server_tries
                     self.bus.emit("waiting", seconds=wait, reason="the model service is busy")
                     self.sleep(wait)
                     continue
-                self.bus.emit("error", kind=e.kind, code=e.code, message=e.message[:500],
-                              model=self.model)
+                self.bus.emit(
+                    "error", kind=e.kind, code=e.code, message=e.message[:500], model=self.model
+                )
                 if self.on_error(e) == "retry":
                     continue
                 return None
@@ -118,16 +135,32 @@ class Agent:
             results = []
             for call in reply.tool_calls:
                 action, target = tools.describe(call.name, call.args)
-                evt = self.bus.emit("tool_call", tool=call.name, action=action, target=target,
-                                    args={k: v for k, v in call.args.items()
-                                          if k not in ("content", "old_text", "new_text")})
+                evt = self.bus.emit(
+                    "tool_call",
+                    tool=call.name,
+                    action=action,
+                    target=target,
+                    args={
+                        k: v
+                        for k, v in call.args.items()
+                        if k not in ("content", "old_text", "new_text")
+                    },
+                )
                 try:
                     outcome = tools.execute(self.ctx, call.name, call.args)
                 except KeyboardInterrupt:
-                    outcome = tools.ToolOutcome("The user cancelled this action.", "cancelled", "denied")
-                self.bus.emit("tool_result", parent_id=evt.id, tool=call.name, status=outcome.status,
-                              summary=outcome.summary, output=outcome.output,
-                              content=outcome.content)
+                    outcome = tools.ToolOutcome(
+                        "The user cancelled this action.", "cancelled", "denied"
+                    )
+                self.bus.emit(
+                    "tool_result",
+                    parent_id=evt.id,
+                    tool=call.name,
+                    status=outcome.status,
+                    summary=outcome.summary,
+                    output=outcome.output,
+                    content=outcome.content,
+                )
                 results.append(ToolResult(call, outcome.output))
-            reply = self._send(lambda: self.chat.send_tool_results(results))
+            reply = self._send(functools.partial(self._send_tool_results, results))
         self.bus.turn_id = None

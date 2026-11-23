@@ -29,8 +29,12 @@ def translate(e: Exception) -> ProviderError:
         code = e.code
         if code == 429:
             return ProviderError(
-                "quota", msg, code=code, retry_after=_retry_delay(e),
-                free_tier="free_tier" in msg, no_quota="limit: 0" in msg,
+                "quota",
+                msg,
+                code=code,
+                retry_after=_retry_delay(e),
+                free_tier="free_tier" in msg,
+                no_quota="limit: 0" in msg,
                 daily="per day" in msg.lower() or "PerDay" in str(e.details),
             )
         if code == 400 and "API key" in msg:
@@ -51,16 +55,21 @@ def _reply(resp: Any) -> Reply:
     text = ""
     try:
         parts = resp.candidates[0].content.parts or []
-        text = "".join(p.text for p in parts if getattr(p, "text", None)
-                       and not getattr(p, "thought", False))
+        text = "".join(
+            p.text for p in parts if getattr(p, "text", None) and not getattr(p, "thought", False)
+        )
     except (AttributeError, IndexError, TypeError):
         pass
-    calls = [ToolCall(name=c.name, args=dict(c.args or {}), id=getattr(c, "id", None))
-             for c in (resp.function_calls or [])]
+    calls = [
+        ToolCall(name=c.name, args=dict(c.args or {}), id=getattr(c, "id", None))
+        for c in (resp.function_calls or [])
+    ]
     usage = Usage()
     if getattr(resp, "usage_metadata", None):
-        usage = Usage(resp.usage_metadata.prompt_token_count or 0,
-                      resp.usage_metadata.candidates_token_count or 0)
+        usage = Usage(
+            resp.usage_metadata.prompt_token_count or 0,
+            resp.usage_metadata.candidates_token_count or 0,
+        )
     return Reply(text=text, tool_calls=calls, usage=usage)
 
 
@@ -71,15 +80,17 @@ class GeminiChat:
     def send(self, message: str) -> Reply:
         try:
             return _reply(self._chat.send_message(message))
-        except Exception as e:  # noqa: BLE001 - every failure becomes a ProviderError
+        except Exception as e:
             raise translate(e) from e
 
     def send_tool_results(self, results: list[ToolResult]) -> Reply:
-        parts = [types.Part.from_function_response(name=r.call.name, response={"result": r.output})
-                 for r in results]
+        parts = [
+            types.Part.from_function_response(name=r.call.name, response={"result": r.output})
+            for r in results
+        ]
         try:
             return _reply(self._chat.send_message(parts))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise translate(e) from e
 
     def history(self) -> Any:
@@ -91,13 +102,19 @@ class GeminiProvider:
 
     def __init__(self, api_key: str):
         # Preview models (e.g. gemini-3.1-pro-preview) are served on v1beta.
-        self.client = genai.Client(api_key=api_key,
-                                   http_options=types.HttpOptions(api_version="v1beta"))
+        self.client = genai.Client(
+            api_key=api_key, http_options=types.HttpOptions(api_version="v1beta")
+        )
 
-    def start_chat(self, model: str, system: str, tools: list[ToolSpec],
-                   history: Any = None) -> GeminiChat:
-        decls = [types.FunctionDeclaration(name=t.name, description=t.description,
-                                           parameters_json_schema=t.parameters) for t in tools]
+    def start_chat(
+        self, model: str, system: str, tools: list[ToolSpec], history: Any = None
+    ) -> GeminiChat:
+        decls = [
+            types.FunctionDeclaration(
+                name=t.name, description=t.description, parameters_json_schema=t.parameters
+            )
+            for t in tools
+        ]
         chat = self.client.chats.create(
             model=model,
             history=history or [],
@@ -111,14 +128,17 @@ class GeminiProvider:
 
     def list_models(self) -> list[str]:
         try:
-            names = [m.name.replace("models/", "") for m in self.client.models.list()
-                     if "generateContent" in (m.supported_actions or [])]
-        except Exception as e:  # noqa: BLE001
+            names = [
+                m.name.replace("models/", "")
+                for m in self.client.models.list()
+                if m.name and "generateContent" in (m.supported_actions or [])
+            ]
+        except Exception as e:
             raise translate(e) from e
         return sorted(names, reverse=True)
 
     def check_model(self, model: str) -> None:
         try:
             self.client.models.get(model=model)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise translate(e) from e

@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 
 from conftest import write
-
 from saicode.core.config import load_config
 from saicode.core.policy import LIST, READ, WRITE, Decision, Policy
 
@@ -13,7 +12,7 @@ def test_defaults_load(project):
     cfg = load_config(project)
     assert cfg.get("model.provider") == "gemini"
     assert cfg.get("permissions.mode") == "ask"
-    assert [l.name for l in cfg.layers] == ["default"]
+    assert [layer.name for layer in cfg.layers] == ["default"]
 
 
 def test_user_overrides_default(project):
@@ -33,29 +32,35 @@ def test_system_policy_wins_and_is_locked(project):
 
 
 def test_deny_lists_are_unioned_not_replaced(project):
-    write(Path(os.environ["SAICODE_USER_CONFIG"]), '[permissions]\ndeny_read = []\n')
+    write(Path(os.environ["SAICODE_USER_CONFIG"]), "[permissions]\ndeny_read = []\n")
     write(project / ".saicode" / "config.toml", '[permissions]\ndeny_read = ["**/*.sqlite"]\n')
     cfg = load_config(project)
     rules = cfg.get("permissions.deny_read")
-    assert ".env" in rules            # an empty user list cannot remove a default
-    assert "**/*.sqlite" in rules     # the project can add
+    assert ".env" in rules  # an empty user list cannot remove a default
+    assert "**/*.sqlite" in rules  # the project can add
 
 
 def test_project_cannot_loosen_permissions_unless_trusted(project):
-    write(project / ".saicode" / "config.toml",
-          '[permissions]\nmode = "auto"\nallow = ["run:*"]\n')
+    write(project / ".saicode" / "config.toml", '[permissions]\nmode = "auto"\nallow = ["run:*"]\n')
     cfg = load_config(project)
     assert cfg.get("permissions.allow") == []
     assert cfg.get("permissions.mode") == "ask"
 
-    write(Path(os.environ["SAICODE_USER_CONFIG"]), '[permissions]\ntrust_project_permissions = true\n')
+    write(
+        Path(os.environ["SAICODE_USER_CONFIG"]), "[permissions]\ntrust_project_permissions = true\n"
+    )
     cfg = load_config(project)
     assert cfg.get("permissions.allow") == ["run:*"]
 
 
 def test_system_can_forbid_project_trust(project):
-    write(Path(os.environ["SAICODE_USER_CONFIG"]), '[permissions]\ntrust_project_permissions = true\n')
-    write(Path(os.environ["SAICODE_SYSTEM_POLICY"]), '[permissions]\ntrust_project_permissions = false\n')
+    write(
+        Path(os.environ["SAICODE_USER_CONFIG"]), "[permissions]\ntrust_project_permissions = true\n"
+    )
+    write(
+        Path(os.environ["SAICODE_SYSTEM_POLICY"]),
+        "[permissions]\ntrust_project_permissions = false\n",
+    )
     write(project / ".saicode" / "config.toml", '[permissions]\nallow = ["run:*"]\n')
     assert load_config(project).get("permissions.allow") == []
 
@@ -103,13 +108,13 @@ def test_allow_rules_and_session_always(project):
 
 
 def test_policy_can_disable_always(project):
-    write(Path(os.environ["SAICODE_SYSTEM_POLICY"]), '[permissions]\nallow_always = false\n')
+    write(Path(os.environ["SAICODE_SYSTEM_POLICY"]), "[permissions]\nallow_always = false\n")
     p = Policy(load_config(project), project)
     assert p.remember_always("run") is False
     assert p.check_command("ls").decision is Decision.ASK
 
 
 def test_sandbox_required_blocks_commands_without_sandbox(project):
-    write(Path(os.environ["SAICODE_SYSTEM_POLICY"]), '[sandbox]\nrequired = true\n')
+    write(Path(os.environ["SAICODE_SYSTEM_POLICY"]), "[sandbox]\nrequired = true\n")
     p = Policy(load_config(project), project)
     assert p.check_command("ls").decision is Decision.DENY

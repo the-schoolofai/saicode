@@ -16,13 +16,13 @@ from __future__ import annotations
 import fnmatch
 import re
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path, PurePosixPath
 
 from saicode.core.config import Config
 
 
-class Decision(str, Enum):
+class Decision(StrEnum):
     ALLOW = "allow"
     ASK = "ask"
     DENY = "deny"
@@ -42,9 +42,7 @@ def _glob(pattern: str, value: str) -> bool:
     # fnmatch "*" already crosses "/", so "**/" also needs to match "no directory".
     if fnmatch.fnmatchcase(value, pattern):
         return True
-    if pattern.startswith("**/") and fnmatch.fnmatchcase(value, pattern[3:]):
-        return True
-    return False
+    return bool(pattern.startswith("**/") and fnmatch.fnmatchcase(value, pattern[3:]))
 
 
 _WORD = "A-Za-z0-9_"
@@ -146,8 +144,9 @@ class Policy:
             for token in _literal_tokens(pattern):
                 found = token.search(cmd)
                 if found:
-                    return Verdict(Decision.DENY,
-                                   f"command touches a protected file ({found.group(0)})")
+                    return Verdict(
+                        Decision.DENY, f"command touches a protected file ({found.group(0)})"
+                    )
         rule = self._rule_matches(self.deny_rules, RUN, cmd)
         if rule:
             return Verdict(Decision.DENY, f"blocked by rule {rule}")

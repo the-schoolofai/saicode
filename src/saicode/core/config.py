@@ -75,7 +75,7 @@ DEFAULTS: dict[str, Any] = {
             "**/.npmrc",
             "**/.pypirc",
         ],
-        "allow_always": True,          # may the user choose "always allow" for a session?
+        "allow_always": True,  # may the user choose "always allow" for a session?
         "trust_project_permissions": False,
     },
     "sandbox": {
@@ -104,10 +104,11 @@ def system_policy_path() -> Path:
     override = os.environ.get("SAICODE_SYSTEM_POLICY")
     if override:
         return Path(override)
-    if sys.platform == "darwin":
+    platform: str = sys.platform
+    if platform == "darwin":
         return Path("/Library/Application Support/saicode/policy.toml")
-    if sys.platform.startswith("win"):
-        base = os.environ.get("ProgramData", r"C:\ProgramData")
+    if platform.startswith("win"):
+        base = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
         return Path(base) / "saicode" / "policy.toml"
     return Path("/etc/saicode/policy.toml")
 
@@ -138,8 +139,8 @@ class Layer:
 class Config:
     data: dict[str, Any]
     layers: list[Layer] = field(default_factory=list)
-    sources: dict[str, str] = field(default_factory=dict)   # "a.b" -> layer name
-    locked: set[str] = field(default_factory=set)             # keys set by system policy
+    sources: dict[str, str] = field(default_factory=dict)  # "a.b" -> layer name
+    locked: set[str] = field(default_factory=set)  # keys set by system policy
 
     def get(self, dotted: str, default: Any = None) -> Any:
         node: Any = self.data
@@ -178,7 +179,7 @@ def _read_toml(path: Path) -> dict[str, Any]:
 
 def _merge(base: dict, over: dict, layer: str, sources: dict, prefix: tuple = ()) -> None:
     for key, value in over.items():
-        path = prefix + (key,)
+        path = (*prefix, key)
         dotted = ".".join(path)
         if isinstance(value, dict) and isinstance(base.get(key), dict):
             _merge(base[key], value, layer, sources, path)
@@ -230,15 +231,17 @@ def load_config(workdir: Path) -> Config:
                     node.pop(key, None)
         perms = project.get("permissions")
         if isinstance(perms, dict):
-            perms.pop("trust_project_permissions", None)   # a repo cannot trust itself
+            perms.pop("trust_project_permissions", None)  # a repo cannot trust itself
             if not trust_project:
                 perms.pop("allow", None)
-                perms.pop("mode", None)          # a repo cannot loosen the permission mode
+                perms.pop("mode", None)  # a repo cannot loosen the permission mode
                 perms.pop("allow_always", None)
 
-    for name, path, layer in (("user", user_path, user),
-                              ("project", project_path, project),
-                              ("system", system_path, system)):
+    for name, path, layer in (
+        ("user", user_path, user),
+        ("project", project_path, project),
+        ("system", system_path, system),
+    ):
         if layer:
             _merge(data, layer, name, sources)
             layers.append(Layer(name, path, layer))

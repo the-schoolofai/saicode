@@ -10,10 +10,11 @@ import getpass
 import json
 import socket
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from saicode import __version__
 
@@ -23,7 +24,7 @@ CONTENT_FIELDS = {"content", "output", "text", "diff", "old_text", "new_text", "
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
 
 
 def new_id(prefix: str) -> str:
@@ -68,9 +69,17 @@ class EventBus:
 
     def emit(self, type: str, parent_id: str | None = None, **data: Any) -> Event:
         self.seq += 1
-        event = Event(type=type, data=data, id=new_id("evt"), session_id=self.session_id,
-                      user=self.user, seq=self.seq, ts=_now(), turn_id=self.turn_id,
-                      parent_id=parent_id)
+        event = Event(
+            type=type,
+            data=data,
+            id=new_id("evt"),
+            session_id=self.session_id,
+            user=self.user,
+            seq=self.seq,
+            ts=_now(),
+            turn_id=self.turn_id,
+            parent_id=parent_id,
+        )
         for listener in list(self.listeners):
             listener(event)
         return event
@@ -80,7 +89,7 @@ class SessionLog:
     """Append-only JSONL file: one event per line."""
 
     def __init__(self, directory: Path, session_id: str, include_content: bool):
-        day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        day = datetime.now(UTC).strftime("%Y-%m-%d")
         self.path = directory.expanduser() / day / f"{session_id}.jsonl"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.include_content = include_content
@@ -94,8 +103,9 @@ class SessionLog:
         self._file.close()
 
 
-def session_metadata(workdir: Path, model: str, provider: str, config_sources: list[str],
-                     identity_email: str) -> dict[str, Any]:
+def session_metadata(
+    workdir: Path, model: str, provider: str, config_sources: list[str], identity_email: str
+) -> dict[str, Any]:
     return {
         "saicode_version": __version__,
         "host": socket.gethostname(),

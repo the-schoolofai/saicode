@@ -23,8 +23,8 @@ Upgrade with `uv tool upgrade saicode` (or `pipx upgrade saicode`).
 ### From source
 
 ```bash
-git clone <repository-url>
-cd <repository-folder>
+git clone https://github.com/the-schoolofai/saicode.git
+cd saicode
 uv tool install .
 ```
 
@@ -137,11 +137,18 @@ tests/       pytest suite
 
 The core never imports the UI. Editor integrations (ACP, VS Code) and headless mode will reuse the same core.
 
-## Run the tests
+## Development
 
 ```bash
-uv run --extra dev pytest -q
+uv sync --extra dev          # install saicode and the dev tools
+uv run pytest                # tests
+uv run ruff check            # lint
+uv run ruff format           # format
+uv run mypy                  # type check
 ```
+
+CI runs all of these on every push and pull request, testing Python 3.11 to 3.14 on
+Linux, macOS and Windows. A pull request should keep every check green.
 
 ## Known limits in 0.3.0
 
@@ -151,12 +158,12 @@ uv run --extra dev pytest -q
 
 ## Security
 
-Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
+Please report vulnerabilities privately. See [SECURITY.md](https://github.com/the-schoolofai/saicode/blob/main/SECURITY.md).
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md).
+See [CHANGELOG.md](https://github.com/the-schoolofai/saicode/blob/main/CHANGELOG.md).
 
 ## License
 
-Licensed under the [Apache License, Version 2.0](LICENSE). Copyright 2026 SAI Code Team.
+Licensed under the [Apache License, Version 2.0](https://github.com/the-schoolofai/saicode/blob/main/LICENSE). Copyright 2026 SAI Code Team.

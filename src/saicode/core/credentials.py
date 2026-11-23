@@ -18,7 +18,8 @@ ENV_VARS = {
 
 def _keyring():
     try:
-        import keyring  # type: ignore
+        import keyring
+
         return keyring
     except Exception:
         return None

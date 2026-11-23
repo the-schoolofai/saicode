@@ -22,7 +22,9 @@ def create_provider(config: Config) -> Provider:
     allowed = config.get("providers.allowed", [])
     if name not in allowed:
         raise ProviderNotAllowed(
-            f"Provider '{name}' is not allowed by your configuration (allowed: {', '.join(allowed) or 'none'}).")
+            f"Provider '{name}' is not allowed by your configuration "
+            f"(allowed: {', '.join(allowed) or 'none'})."
+        )
     if name not in KNOWN_PROVIDERS:
         raise ProviderNotAllowed(f"Provider '{name}' is not supported yet.")
     key, _source = get_api_key(name)
@@ -30,8 +32,15 @@ def create_provider(config: Config) -> Provider:
         raise MissingCredentials(name)
     if name == "gemini":
         from saicode.ai.gemini import GeminiProvider
+
         return GeminiProvider(key)
     raise ProviderNotAllowed(name)
 
 
-__all__ = ["create_provider", "Provider", "ProviderError", "ProviderNotAllowed", "MissingCredentials"]
+__all__ = [
+    "MissingCredentials",
+    "Provider",
+    "ProviderError",
+    "ProviderNotAllowed",
+    "create_provider",
+]

@@ -36,8 +36,14 @@ class LocalRunner:
     def run(self, command: str, cwd: Path, timeout: int = 300) -> RunResult:
         try:
             # Shell is intentional: this runner executes the agent's shell tool commands.
-            r = subprocess.run(command, shell=True, cwd=cwd, capture_output=True,  # nosec B602
-                               text=True, timeout=timeout)
+            r = subprocess.run(
+                command,
+                shell=True,
+                cwd=cwd,
+                capture_output=True,  # nosec B602
+                text=True,
+                timeout=timeout,
+            )
         except subprocess.TimeoutExpired:
             return RunResult(exit_code=-1, output=f"timed out after {timeout}s", timed_out=True)
         return RunResult(exit_code=r.returncode, output=(r.stdout + r.stderr).strip())
@@ -46,4 +52,6 @@ class LocalRunner:
 def create_runner(mode: str) -> Runner:
     if mode in ("off", "", None):
         return LocalRunner()
-    raise ValueError(f"Sandbox mode '{mode}' is not available in this version (coming in phase A2).")
+    raise ValueError(
+        f"Sandbox mode '{mode}' is not available in this version (coming in phase A2)."
+    )

@@ -10,7 +10,7 @@ from typing import Any, Protocol
 class ToolSpec:
     name: str
     description: str
-    parameters: dict[str, Any]          # JSON Schema object
+    parameters: dict[str, Any]  # JSON Schema object
 
 
 @dataclass
@@ -45,9 +45,17 @@ class ProviderError(Exception):
     kind: "quota" | "auth" | "permission" | "not_found" | "server" | "network" | "other"
     """
 
-    def __init__(self, kind: str, message: str, *, retry_after: int | None = None,
-                 free_tier: bool = False, no_quota: bool = False, daily: bool = False,
-                 code: int | None = None):
+    def __init__(
+        self,
+        kind: str,
+        message: str,
+        *,
+        retry_after: int | None = None,
+        free_tier: bool = False,
+        no_quota: bool = False,
+        daily: bool = False,
+        code: int | None = None,
+    ):
         super().__init__(message)
         self.kind = kind
         self.message = message
@@ -67,7 +75,8 @@ class ChatSession(Protocol):
 class Provider(Protocol):
     name: str
 
-    def start_chat(self, model: str, system: str, tools: list[ToolSpec],
-                   history: Any = None) -> ChatSession: ...
+    def start_chat(
+        self, model: str, system: str, tools: list[ToolSpec], history: Any = None
+    ) -> ChatSession: ...
     def list_models(self) -> list[str]: ...
     def check_model(self, model: str) -> None: ...

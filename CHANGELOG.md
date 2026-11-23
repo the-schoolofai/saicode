@@ -38,5 +38,5 @@ First public release. Completes roadmap phase A1 (Foundation).
 - A project config (which comes from the repository) cannot loosen permissions,
   mark itself as trusted, or change logging, identity or the provider allowlist.
 
-[Unreleased]: https://github.com/OWNER/REPO/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/OWNER/REPO/releases/tag/v0.3.0
+[Unreleased]: https://github.com/the-schoolofai/saicode/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/the-schoolofai/saicode/releases/tag/v0.3.0

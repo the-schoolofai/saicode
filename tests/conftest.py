@@ -72,4 +72,6 @@ class FakeProvider:
 
 
 def reply(text: str = "", calls: list[tuple[str, dict]] | None = None) -> Reply:
-    return Reply(text=text, tool_calls=[ToolCall(n, a) for n, a in (calls or [])], usage=Usage(10, 5))
+    return Reply(
+        text=text, tool_calls=[ToolCall(n, a) for n, a in (calls or [])], usage=Usage(10, 5)
+    )
