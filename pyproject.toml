@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "saicode"
+version = "0.3.0"
+description = "A terminal coding agent: small core, safe by default, enterprise-ready foundations."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "saicode" }]
+# Ranges are capped at the next major version. For production builds,
+# install from the lock file (uv.lock) so every version is pinned exactly.
+dependencies = [
+    "google-genai>=1.50,<4",
+    "rich>=13.7,<15",
+    "prompt_toolkit>=3.0.40,<4",
+    "keyring>=25,<27",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+# dev = ["pytest-cov", "ruff", "mypy"]
+
+[project.scripts]
+saicode = "saicode.cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saicode"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

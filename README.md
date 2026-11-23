@@ -1,0 +1,136 @@
+# SAI Code
+
+A terminal coding agent: small core, safe by default, built on enterprise-ready foundations.
+
+Version 0.3.0 completes roadmap phase **A1 (Foundation)**.
+
+## Install (macOS, Linux)
+
+```bash
+git clone <repository-url>
+cd <repository-folder>
+uv tool install . --python 3.12
+```
+
+If you used the old `alias saicode=...` in `~/.zshrc`, remove that line first, then open a new terminal.
+
+## Store your API key (once)
+
+```bash
+saicode login
+```
+
+The key goes into the system keychain (macOS Keychain). You can also use the
+`GEMINI_API_KEY` environment variable; it takes priority over the keychain.
+
+## Use
+
+```bash
+cd ~/your-project
+saicode
+saicode --model gemini-3-flash-preview
+```
+
+Inside saicode: `/help`, `/model`, `/models`, `/status`, `/config`, `/clear`, `/exit`.
+
+Other commands:
+
+```bash
+saicode config      # effective settings and where each one comes from
+saicode logout      # remove the stored key
+saicode --version
+```
+
+## Configuration layers
+
+Later layers win. The system policy always wins and cannot be overridden.
+
+| Layer   | File |
+| ------- | ---- |
+| default | built in |
+| user    | `~/.saicode/config.toml` |
+| project | `<project>/.saicode/config.toml` |
+| system  | macOS `/Library/Application Support/saicode/policy.toml`, Linux `/etc/saicode/policy.toml`, Windows `%ProgramData%\saicode\policy.toml` |
+
+Rules that make the layers safe:
+
+- `permissions.deny` and `permissions.deny_read` are combined across all layers. No layer can remove a rule.
+- A project config comes from the repository, so its `permissions.allow`, `permissions.mode` and
+  `permissions.allow_always` are ignored unless your user config sets `trust_project_permissions = true`
+  (and the system policy does not forbid it).
+- A project config can never change `logging.*`, `identity.email` or `providers.allowed`, so a
+  cloned repository cannot switch off or redirect your session log.
+
+Example user config:
+
+```toml
+[model]
+name = "gemini-3-flash-preview"
+
+[permissions]
+allow = ["run:git status*", "run:pytest*"]
+
+[identity]
+email = "you@example.com"
+```
+
+Example system policy (set by an administrator):
+
+```toml
+[providers]
+allowed = ["gemini"]
+
+[permissions]
+mode = "ask"               # or "read-only"
+allow_always = false       # users must approve every change
+deny = ["run:git push*"]
+
+[logging]
+sessions = true
+include_content = false
+```
+
+## Permissions
+
+| Action | Default |
+| ------ | ------- |
+| list and read files | allowed |
+| protected files (`.env`, keys, `.ssh`, `secrets/`, ...) | always blocked |
+| anything outside the project folder | always blocked |
+| write or edit files | asks, with a diff |
+| run commands | asks; dangerous patterns blocked |
+
+Rules use the form `run:<command glob>`, `write:<path glob>`, `read:<path glob>`.
+
+## Session logs
+
+Every session is written to `~/.saicode/sessions/<date>/<session id>.jsonl`, one event per line,
+each with a session ID, turn ID, event ID, user and timestamp. File contents and command output are
+left out unless `logging.include_content = true`.
+
+## Project layout
+
+```
+src/saicode/
+  ai/        providers behind one interface (Gemini today), provider allowlist
+  core/      config layers, policy engine, events and session log, credentials, agent loop
+  tools/     list, read, write, edit, run - each checks the policy first
+  sandbox/   command runner interface (OS sandbox arrives in phase A2)
+  tui/       the terminal screen; the only package that draws
+  cli/       the `saicode` command
+tests/       pytest suite
+```
+
+The core never imports the UI. Editor integrations (ACP, VS Code) and headless mode will reuse the same core.
+
+## Run the tests
+
+```bash
+uv run --extra dev pytest -q
+```
+
+## Known limits in 0.3.0
+
+- Commands run without an OS sandbox (phase A2). Set `sandbox.required = true` to refuse commands until then.
+- Blocking protected files inside shell commands is best-effort text matching until the sandbox ships.
+- Gemini is the only provider (phase A3 adds more).
