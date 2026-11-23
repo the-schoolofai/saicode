@@ -8,7 +8,7 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-11-23
+## [0.3.0] - 2026-11-24
 
 First public release. Completes roadmap phase A1 (Foundation).
 
