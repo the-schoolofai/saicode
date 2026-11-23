@@ -71,7 +71,7 @@ pycparser==3.12 ; implementation_name != 'PyPy' and platform_python_implementati
     # via cffi
 pydantic==2.14.3
     # via google-genai
-pydantic-core==2.50.4
+pydantic-core==2.50.5
     # via pydantic
 pygments==2.21.0
     # via rich
