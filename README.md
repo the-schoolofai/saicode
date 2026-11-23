@@ -4,15 +4,29 @@ A terminal coding agent: small core, safe by default, built on enterprise-ready 
 
 Version 0.3.0 completes roadmap phase **A1 (Foundation)**.
 
-## Install (macOS, Linux)
+> **Safety note.** saicode reads files, edits files and runs shell commands in your project.
+> It asks before every change and command, but in 0.3.x approved commands run **without an
+> OS sandbox**, with your own permissions. Review each command before you approve it.
+
+## Install
+
+Requires Python 3.11 or newer on macOS, Linux or Windows.
+
+```bash
+uv tool install saicode       # recommended
+# or
+pipx install saicode
+```
+
+Upgrade with `uv tool upgrade saicode` (or `pipx upgrade saicode`).
+
+### From source
 
 ```bash
 git clone <repository-url>
 cd <repository-folder>
-uv tool install . --python 3.12
+uv tool install .
 ```
-
-If you used the old `alias saicode=...` in `~/.zshrc`, remove that line first, then open a new terminal.
 
 ## Store your API key (once)
 
@@ -134,3 +148,15 @@ uv run --extra dev pytest -q
 - Commands run without an OS sandbox (phase A2). Set `sandbox.required = true` to refuse commands until then.
 - Blocking protected files inside shell commands is best-effort text matching until the sandbox ships.
 - Gemini is the only provider (phase A3 adds more).
+
+## Security
+
+Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE). Copyright 2026 SAI Code Team.

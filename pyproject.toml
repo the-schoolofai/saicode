@@ -1,15 +1,35 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+# 1.27+ writes Core Metadata 2.4 (SPDX license expression, License-File).
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "saicode"
-version = "0.3.0"
+dynamic = ["version"]
 description = "A terminal coding agent: small core, safe by default, enterprise-ready foundations."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Proprietary" }
-authors = [{ name = "saicode" }]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "SAI Code Team" }]
+maintainers = [{ name = "Muhammad Rizwan" }]
+keywords = ["ai", "agent", "coding-agent", "cli", "terminal", "llm", "gemini", "developer-tools"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 # Ranges are capped at the next major version. For production builds,
 # install from the lock file (uv.lock) so every version is pinned exactly.
 dependencies = [
@@ -21,13 +41,29 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
-# dev = ["pytest-cov", "ruff", "mypy"]
 
 [project.scripts]
 saicode = "saicode.cli.main:main"
 
+# [project.urls] is added once the GitHub repository URL is final.
+
+[tool.hatch.version]
+path = "src/saicode/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/saicode"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/saicode",
+    "tests",
+    "README.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "LICENSE",
+    "NOTICE",
+    "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
