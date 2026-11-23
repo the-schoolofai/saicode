@@ -22,7 +22,7 @@ distro==1.9.0
     # via google-genai
 google-auth==2.62.2
     # via google-genai
-google-genai==3.5.0
+google-genai==3.6.1
     # via saicode
 h11==0.16.0 ; sys_platform != 'emscripten'
     # via httpcore2
