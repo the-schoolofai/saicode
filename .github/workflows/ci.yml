@@ -58,9 +58,17 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
+      # Every supported Python on Linux; the oldest and newest on macOS and Windows.
+      # Platform differences rarely depend on the minor Python version, and macOS
+      # runners are the scarcest hosted runners, so this keeps CI fast and reliable.
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest]
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - { os: macos-latest, python-version: "3.11" }
+          - { os: macos-latest, python-version: "3.14" }
+          - { os: windows-latest, python-version: "3.11" }
+          - { os: windows-latest, python-version: "3.14" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
