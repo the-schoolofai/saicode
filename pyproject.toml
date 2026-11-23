@@ -34,7 +34,7 @@ classifiers = [
 # install from the lock file (uv.lock) so every version is pinned exactly.
 dependencies = [
     "google-genai>=1.50,<4",
-    "rich>=13.7,<15",
+    "rich>=13.7,<16",
     "prompt_toolkit>=3.0.40,<4",
     "keyring>=25,<27",
 ]

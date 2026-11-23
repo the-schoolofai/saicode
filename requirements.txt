@@ -81,7 +81,7 @@ requests==2.34.2
     # via
     #   google-auth
     #   google-genai
-rich==14.3.4
+rich==15.0.0
     # via saicode
 secretstorage==3.5.0 ; sys_platform == 'linux'
     # via keyring
